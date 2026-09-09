@@ -164,7 +164,7 @@ src/grokzip/
     style.py          shared figure style
 
 scripts/              one executable per phase
-results/              all intermediate CSVs (committed)
-figures/              report figures (PDF + PNG)
+results/              all intermediate CSVs
+figures/              report figures
 report/               LaTeX source of the two-page report
 ```
