@@ -246,8 +246,3 @@ uv run python scripts/run_trajectories.py --retention 0.8  --out results/traject
 uv run python scripts/run_trajectories.py --retention 0.95 --out results/trajectories_r95.csv
 ```
 
-### Tests
-
-```bash
-uv run pytest
-```
