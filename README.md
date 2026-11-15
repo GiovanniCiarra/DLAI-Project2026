@@ -2,8 +2,20 @@
 
 **Not All Compression Is Equal: Rank Separates Memorisation from Generalisation in Grokking**
 
+![Python](https://img.shields.io/badge/python-3.12+-3776AB?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.7+-EE4C2C?logo=pytorch&logoColor=white)
+![uv](https://img.shields.io/badge/managed%20with-uv-DE5FE9)
+
 Project for _Deep Learning and Applied AI_, a.y. 2025/2026, Sapienza University of Rome.
 Giovanni Ciarravano — `ciarravano.1989209@studenti.uniroma1.it`
+
+📄 **[Two-page report (PDF)](report/main.pdf)**
+
+> **TL;DR** — Can you tell whether a network has *memorised* or *generalised* without a held-out set?
+> Post-hoc SVD rank truncation can: it separates the two phases with a +0.86 gap in retained
+> training accuracy, against +0.38 for pruning and +0.22 for quantisation. A detector built on the
+> *minimal viable rank* r\* finds 12/12 grokking runs and 0/4 controls. It does **not** anticipate
+> grokking, though: that negative result is reported in full below.
 
 ---
 
@@ -45,6 +57,8 @@ At rank 16 _every_ generalising anchor retains its full training accuracy, with 
 variance across runs. Pruning and quantisation separate two to four times less, with
 overlapping error bands.
 
+![Retained training accuracy under the three compression operators](figures/fig1_operators.png)
+
 ### 2. Three disjoint populations, separated without a test set
 
 The **minimal viable rank** is defined on training data only:
@@ -64,6 +78,8 @@ generalisation.
 | `long`    | 25%  | 1.0          | 4    | 10–14     | 9–10               | 4/4      |
 | `nc_mem`  | 20%  | 1.0          | 2    | 33–34     | 32                 | 0/2      |
 | `nc_wd0`  | 30%  | 0.0          | 2    | 77–83     | 61–62              | 0/2      |
+
+![Test accuracy and minimal viable rank r* along training](figures/fig2_trajectories.png)
 
 The controls are complementary. `nc_wd0` rules out long training as the cause;
 `nc_mem` carries the _same_ weight decay as `main`, so any signal that is a by-product
@@ -167,4 +183,71 @@ scripts/              one executable per phase
 results/              all intermediate CSVs
 figures/              report figures
 report/               LaTeX source of the two-page report
+```
+
+---
+
+## Reproducing the results
+
+The project is managed with [uv](https://docs.astral.sh/uv/) and requires Python ≥ 3.12.
+PyTorch is pulled from the CUDA 12.8 wheel index (see `pyproject.toml`); edit
+`[tool.uv.sources]` if you need a CPU-only or different CUDA build.
+
+```bash
+git clone https://github.com/GiovanniCiarra/DLAI-Project2026.git
+cd DLAI-Project2026
+uv sync
+```
+
+### Regenerate the figures (no GPU, ~1 minute)
+
+All intermediate results are committed in `results/`, so the figures and the summary
+statistics can be rebuilt without retraining:
+
+```bash
+uv run python scripts/make_figures.py
+```
+
+### Full pipeline (GPU recommended)
+
+Checkpoints are not committed (they are written to `checkpoints/`), so the full pipeline
+starts from training:
+
+```bash
+# 0. (optional) regime scan over the training fraction
+uv run python scripts/scan_fraction.py
+
+# 1. train the four conditions and save checkpoints
+uv run python scripts/run_experiment.py --condition main
+uv run python scripts/run_experiment.py --condition long
+uv run python scripts/run_experiment.py --condition nc_mem
+uv run python scripts/run_experiment.py --condition nc_wd0
+
+# 2. compression sweep at the anchors, and r* along every trajectory
+uv run python scripts/run_sweep.py
+uv run python scripts/run_trajectories.py
+
+# 3. detector calibration + sign test, Fourier analysis
+uv run python scripts/run_detector.py
+uv run python scripts/run_fourier.py
+uv run python scripts/analyze_fourier.py
+
+# 4. figures
+uv run python scripts/make_figures.py
+```
+
+Robustness checks (`check_monotonicity.py`, `check_retention.py`, `check_test_under_rank.py`,
+`sensitivity.py`) and plain-text reports (`report_sweep.py`, `report_trajectories.py`) can
+be run the same way once the CSVs exist. `check_retention.py` also needs the trajectories
+at 80% and 95% retention:
+
+```bash
+uv run python scripts/run_trajectories.py --retention 0.8  --out results/trajectories_r80.csv
+uv run python scripts/run_trajectories.py --retention 0.95 --out results/trajectories_r95.csv
+```
+
+### Tests
+
+```bash
+uv run pytest
 ```
